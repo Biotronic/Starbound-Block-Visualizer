@@ -2,6 +2,7 @@
 using System.Diagnostics;
 using System.Drawing;
 using System.IO;
+using System.Linq;
 using System.Windows.Forms;
 using StarboundVisualizer.Components;
 using Point = StarboundVisualizer.Components.JsonClasses.Point;
@@ -15,6 +16,8 @@ namespace StarboundBlockVisualizer
         public Form1()
         {
             InitializeComponent();
+
+            textBox1.Text = string.Join(Environment.NewLine, PathFinder.Paths);
 
             pictureBox2.ClientSize = new Size(256, 256);
 
@@ -123,7 +126,7 @@ namespace StarboundBlockVisualizer
                 var material = new Material(file);
                 visualControl1.Material = material;
                 var shot = Crop(visualControl1.Screenshot());
-                shot.Save(Path.Combine(@"E:\Starbound\Materials", material.MaterialName + ".png"));
+                shot.Save(Path.Combine(textBox2.Text, material.MaterialName + ".png"));
             }
         }
 
@@ -215,6 +218,25 @@ namespace StarboundBlockVisualizer
             if (openFileDialog1.ShowDialog() != DialogResult.OK) return;
 
             visualControl1.Material = new Material(openFileDialog1.FileName);
+        }
+
+        private void button2_Click(object sender, EventArgs e)
+        {
+            if (folderBrowserDialog1.ShowDialog() != DialogResult.OK) return;
+
+            textBox1.Text += Environment.NewLine + folderBrowserDialog1.SelectedPath;
+        }
+
+        private void textBox1_TextChanged(object sender, EventArgs e)
+        {
+            PathFinder.Paths = textBox1.Lines.ToList();
+        }
+
+        private void button4_Click(object sender, EventArgs e)
+        {
+            if (folderBrowserDialog1.ShowDialog() != DialogResult.OK) return;
+
+            textBox2.Text = folderBrowserDialog1.SelectedPath;
         }
     }
 }

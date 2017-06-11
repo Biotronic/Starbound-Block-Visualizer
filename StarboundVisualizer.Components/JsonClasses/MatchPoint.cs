@@ -1,16 +1,16 @@
 using Newtonsoft.Json;
 
-namespace StarboundBlockVisualizer.JsonClasses
+namespace StarboundVisualizer.Components.JsonClasses
 {
     [JsonConverter(typeof(ArrayToObjectConverter))]
-    public class ReplacementPiece
+    public class MatchPoint
     {
-        public string Piece { get; set; }
         public Point Position { get; set; }
+        public string MatchType { get; set; }
 
         public override string ToString()
         {
-            return $"Match({Position}, {Piece})";
+            return $"Match({Position}, {MatchType})";
         }
     }
 }

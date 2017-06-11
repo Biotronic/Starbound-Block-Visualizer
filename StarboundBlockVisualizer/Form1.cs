@@ -1,27 +1,15 @@
 ﻿using System;
-using System.Collections.Generic;
 using System.Diagnostics;
 using System.Drawing;
 using System.IO;
-using System.Linq;
-using System.Text;
 using System.Windows.Forms;
-using Newtonsoft.Json;
-using Newtonsoft.Json.Linq;
-using StarboundBlockVisualizer.JsonClasses;
-using Point = StarboundBlockVisualizer.JsonClasses.Point;
+using StarboundVisualizer.Components;
+using Point = StarboundVisualizer.Components.JsonClasses.Point;
 
 namespace StarboundBlockVisualizer
 {
     public partial class Form1 : Form
     {
-        private static readonly string[] Paths = { @"D:\GitHub\FrackinUniverse\", @"E:\Starbound\unpacked\" };
-        private Image Image { get; set; }
-        private Dictionary<string, Piece> Pieces { get; set; }
-        public List<Match> Matches { get; set; }
-        private bool _ready = false;
-
-        private readonly bool[,] _array = new bool[16, 16];
         private bool _down;
 
         public Form1()
@@ -30,175 +18,43 @@ namespace StarboundBlockVisualizer
 
             pictureBox2.ClientSize = new Size(256, 256);
 
-            Foo();
-        }
-
-        private void Foo()
-        {
-            const string materialPath = @"\tiles\materials\avalitechpanel.material";
-
-            var material = ParseFile(materialPath);
-            var renderTemplatePath = (string)material.SelectToken("$.renderTemplate");
-            var renderTemplate = ParseFile(renderTemplatePath, Path.GetDirectoryName(FindFile(materialPath)));
-            var texturePath = (string)material.SelectToken("$.renderParameters.texture");
-
-            var piecesToken = renderTemplate.SelectToken("$.pieces");
-
-            Pieces = piecesToken.ToObject<Dictionary<string, Piece>>();
-            Matches = renderTemplate.SelectToken("$.matches[0][1]").ToObject<List<Match>>();
-            Image = Image.FromFile(FindFile(texturePath, Path.GetDirectoryName(FindFile(materialPath))));
-
-            udVariant.Minimum = 0;
-            udVariant.Maximum = (long)material.SelectToken("$.renderParameters.variants") - 1;
-
             cmbColor.SelectedIndex = 0;
-            _ready = true;
 
+            visualControl1.Array = new bool[16, 16];
 
-            var sb = new StringBuilder();
-            foreach (var pair in Pieces)
-            {
-                //sb.AppendLine($".{pair.Key} {{\n" +
-                //              $"    width:  {pair.Value.TextureSize.X}px;\n" +
-                //              $"    height: {pair.Value.TextureSize.Y}px;\n" +
-                //              $"    background-position: {-pair.Value.TexturePosition.X}px {-pair.Value.TexturePosition.Y}px;\n"+
-                //              $"}}\n");
+            visualControl1.Array[3, 3] = true;
+            visualControl1.Array[3, 4] = true;
+            visualControl1.Array[3, 5] = true;
+            visualControl1.Array[4, 3] = true;
+            visualControl1.Array[4, 4] = true;
+            visualControl1.Array[4, 5] = true;
+            visualControl1.Array[5, 3] = true;
+            visualControl1.Array[5, 4] = true;
+            visualControl1.Array[5, 5] = true;
 
-                //if (string.IsNullOrEmpty(pair.Value.Texture))
-                //sb.AppendLine($"<div><div class=\"{pair.Key}\"></div>{pair.Key}</div>");
-            }
-            textBox1.Text = sb.ToString();
+            Application.Idle += Application_Idle;
         }
 
-        private static string FindFile(string filename, string basePath = null)
+        protected override void OnPaint(PaintEventArgs e)
         {
-            filename = filename.Replace('/', '\\');
-            if (filename.StartsWith(@"\"))
-            {
-                foreach (var path in Paths)
-                {
-                    var combined = Path.Combine(path, filename.Substring(1));
-                    if (File.Exists(combined)) return combined;
-                }
-            }
-            if (basePath != null)
-            {
-                return Path.Combine(basePath, filename);
-            }
-            return null;
+            base.OnPaint(e);
+            DrawRawImage(pictureBox2);
         }
 
-        private static JObject ParseFile(string filename, string basePath = null)
+        private void Application_Idle(object sender, EventArgs e)
         {
-            filename = FindFile(filename, basePath);
-
-            using (var fs = File.OpenRead(filename))
-            using (var sr = new StreamReader(fs))
-            using (var jr = new JsonTextReader(sr))
-                return JObject.Load(jr);
+            visualControl1.Repaint();
         }
 
-        private void udVariant_ValueChanged(object sender, System.EventArgs e)
+        private void udVariant_ValueChanged(object sender, EventArgs e)
         {
-            DrawFancyImage(_array, pictureBox1);
+            visualControl1.ColorIndex = cmbColor.SelectedIndex;
         }
 
-        private void DrawFancyImage(bool[,] array, Control control)
+        private void DrawRawImage(Control control)
         {
-            var gfx = control.CreateGraphics();
-            gfx.Clear(SystemColors.ButtonFace);
+            var array = visualControl1.Array;
 
-            for (var y = 0; y < array.GetLength(1); ++y)
-            {
-                for (var x = 0; x < array.GetLength(0); ++x)
-                {
-                    if (!array[x, y]) continue;
-
-                    foreach (var match in Matches)
-                    {
-                        Apply(gfx, Image, array, new Point(x, y), match);
-                    }
-                }
-            }
-        }
-
-        private void Apply(Graphics gfx, Image texture, bool[,] array, Point pos, Match rule)
-        {
-            if (!IsMatch(array, pos, rule)) return;
-
-            Debug.Assert(rule.MatchAllPoints.Count <= 1);
-            Debug.Assert(rule.Pieces.Count <= 1);
-            //textBox1.Text += $@"pos: {pos} + {piece.Position}, {piece.Piece} {Environment.NewLine}";
-            
-            foreach (var subMatch in rule.SubMatches)
-            {
-                Apply(gfx, texture, array, pos, subMatch);
-            }
-
-            foreach (var piece in rule.Pieces)
-            {
-                DrawPiece(piece, gfx, texture, pos);
-            }
-        }
-
-        private static readonly string[] Adds = { "bottomRightEdge", "bottomLeftEdge", "cornerLR", "cornerLL" };
-        private static readonly string[] Subs = { "topRightEdge", "topLeftEdge", "cornerUR", "cornerUL" };
-
-        private void DrawPiece(ReplacementPiece piece, Graphics gfx, Image texture, Point pos)
-        {
-            var p = (pos * 8 + piece.Position);
-            var tile = GetTile(piece.Piece);
-
-            var p2 = piece.Position;
-
-            if (Adds.Contains(piece.Piece))
-            {
-                p.Y += 12;
-                p2.Y += 12;
-            }
-
-            if (Subs.Contains(piece.Piece))
-            {
-                p.Y -= 12;
-                p2.Y -= 12;
-            }
-
-
-            //// ReSharper disable once LocalizableElement
-            //textBox1.Text +=
-            //    $"<div class=\"{piece.Piece}\" style=\"left: {p.X}px; top: {p.Y}px;\"></div>";
-
-            gfx.DrawImage(texture, p.ToRect(new Point(tile.Width, tile.Height)), tile, GraphicsUnit.Pixel);
-        }
-
-        private Rectangle GetTile(string pieceName)
-        {
-            var variant = (int)udVariant.Value;
-            var color = cmbColor.SelectedIndex;
-            var piece = Pieces[pieceName];
-            return (piece.TexturePosition + piece.ColorStride * color + piece.VariantStride * variant).ToRect(piece.TextureSize);
-        }
-
-        private static bool IsMatch(bool[,] array, Point pos, Match rule)
-        {
-            return rule.MatchAllPoints.All(DoesMatch(array, pos));
-        }
-
-        private static Func<MatchPoint, bool> DoesMatch(bool[,] array, Point pos)
-        {
-            return a =>
-            {
-                var p = a.Position + new Point((int)pos.X, (int)pos.Y);
-                if (p.X < 0 || p.X >= array.GetLength(0)) return false;
-                if (p.Y < 0 || p.Y >= array.GetLength(1)) return false;
-                if (a.MatchType == "Shadows" || a.MatchType == "NotShadows") return false;
-
-                return array[p.X, p.Y] == (a.MatchType == "EqualsSelf");
-            };
-        }
-
-        private static void DrawRawImage(bool[,] array, Control control)
-        {
             var xf = array.GetLength(0) / (float)control.ClientSize.Width;
             var yf = array.GetLength(1) / (float)control.ClientSize.Height;
 
@@ -214,7 +70,7 @@ namespace StarboundBlockVisualizer
                     if (array[x, y])
                     {
                         gfx.FillRectangle(brush,
-                            new Rectangle((int)(x / xf), control.ClientSize.Height - (int)((y+1) / yf), (int)(1 / xf), (int)(1 / yf)));
+                            new Rectangle((int)(x / xf), control.ClientSize.Height - (int)((y + 1) / yf), (int)(1 / xf), (int)(1 / yf)));
                     }
                 }
             }
@@ -236,8 +92,8 @@ namespace StarboundBlockVisualizer
         {
             if (!e.Button.HasFlag(MouseButtons.Left)) return;
 
-            var pos = GetArrayIndex(_array, pictureBox2, e.X, e.Y);
-            _down = !_array[pos.X, pos.Y];
+            var pos = GetArrayIndex(visualControl1.Array, pictureBox2, e.X, e.Y);
+            _down = !visualControl1.Array[pos.X, pos.Y];
 
             pictureBox2_MouseMove(sender, e);
         }
@@ -245,15 +101,120 @@ namespace StarboundBlockVisualizer
         private void pictureBox2_MouseMove(object sender, MouseEventArgs e)
         {
             if (!e.Button.HasFlag(MouseButtons.Left)) return;
-            var pos = GetArrayIndex(_array, pictureBox2, e.X, e.Y);
+            var pos = GetArrayIndex(visualControl1.Array, pictureBox2, e.X, e.Y);
 
-            if (_array[pos.X, pos.Y] == _down) return;
+            if (visualControl1.Array[pos.X, pos.Y] == _down) return;
 
 
-            _array[pos.X, pos.Y] = _down;
+            visualControl1.Array[pos.X, pos.Y] = _down;
+
+            DrawRawImage(pictureBox2);
+        }
+
+        private void button1_Click(object sender, EventArgs e)
+        {
+            if (openFileDialog1.ShowDialog() != DialogResult.OK) return;
+
+            var dir = Path.GetDirectoryName(openFileDialog1.FileName);
+
+            Debug.Assert(dir != null, "dir != null");
+            foreach (var file in Directory.EnumerateFiles(dir, "*.material", SearchOption.AllDirectories))
+            {
+                var material = new Material(file);
+                visualControl1.Material = material;
+                var shot = Crop(visualControl1.Screenshot());
+                shot.Save(Path.Combine(@"E:\Starbound\Materials", material.MaterialName + ".png"));
+            }
+        }
+
+        public static Bitmap Crop(Bitmap bmp)
+        {
+            var w = bmp.Width;
+            var h = bmp.Height;
+
+            Func<int, bool> allWhiteRow = row =>
+            {
+                for (var i = 0; i < w; ++i)
+                    if (bmp.GetPixel(i, row).A != 0)
+                        return false;
+                return true;
+            };
+
+            Func<int, bool> allWhiteColumn = col =>
+            {
+                for (var i = 0; i < h; ++i)
+                    if (bmp.GetPixel(col, i).A != 0)
+                        return false;
+                return true;
+            };
+
+            var topmost = 0;
+            for (var row = 0; row < h; ++row)
+            {
+                if (allWhiteRow(row))
+                    topmost = row;
+                else break;
+            }
+
+            var bottommost = 0;
+            for (var row = h - 1; row >= 0; --row)
+            {
+                if (allWhiteRow(row))
+                    bottommost = row;
+                else break;
+            }
+
+            int leftmost = 0, rightmost = 0;
+            for (var col = 0; col < w; ++col)
+            {
+                if (allWhiteColumn(col))
+                    leftmost = col;
+                else
+                    break;
+            }
+
+            for (var col = w - 1; col >= 0; --col)
+            {
+                if (allWhiteColumn(col))
+                    rightmost = col;
+                else
+                    break;
+            }
+
+            if (rightmost == 0) rightmost = w;
+            if (bottommost == 0) bottommost = h;
+
+            var croppedWidth = rightmost - leftmost;
+            var croppedHeight = bottommost - topmost;
+
+            if (croppedWidth == 0)
+            {
+                leftmost = 0;
+                croppedWidth = w;
+            }
+
+            if (croppedHeight == 0)
+            {
+                topmost = 0;
+                croppedHeight = h;
+            }
             
-            DrawRawImage(_array, pictureBox2);
-            DrawFancyImage(_array, pictureBox1);
+            var target = new Bitmap(croppedWidth, croppedHeight);
+            using (var g = Graphics.FromImage(target))
+            {
+                g.DrawImage(bmp,
+                    new RectangleF(0, 0, croppedWidth, croppedHeight),
+                    new RectangleF(leftmost, topmost, croppedWidth, croppedHeight),
+                    GraphicsUnit.Pixel);
+            }
+            return target;
+        }
+
+        private void button3_Click(object sender, EventArgs e)
+        {
+            if (openFileDialog1.ShowDialog() != DialogResult.OK) return;
+
+            visualControl1.Material = new Material(openFileDialog1.FileName);
         }
     }
 }

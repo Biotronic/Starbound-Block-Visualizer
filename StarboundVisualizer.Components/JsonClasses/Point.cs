@@ -1,7 +1,7 @@
 using System.Drawing;
 using Newtonsoft.Json;
 
-namespace StarboundBlockVisualizer.JsonClasses
+namespace StarboundVisualizer.Components.JsonClasses
 {
     [JsonConverter(typeof(ArrayToObjectConverter))]
     public struct Point

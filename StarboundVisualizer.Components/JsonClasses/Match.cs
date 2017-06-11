@@ -1,7 +1,7 @@
 using System.Collections.Generic;
 using System.Linq;
 
-namespace StarboundBlockVisualizer.JsonClasses
+namespace StarboundVisualizer.Components.JsonClasses
 {
     public class Match
     {

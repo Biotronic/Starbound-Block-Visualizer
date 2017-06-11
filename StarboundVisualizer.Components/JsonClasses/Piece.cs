@@ -1,4 +1,4 @@
-namespace StarboundBlockVisualizer.JsonClasses
+namespace StarboundVisualizer.Components.JsonClasses
 {
     public class Piece
     {
